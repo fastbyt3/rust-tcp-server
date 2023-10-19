@@ -9,9 +9,14 @@ fn handle_connection(mut stream: TcpStream) {
     let path = request.split_whitespace().nth(1).expect("PATH was not found at specified position");
     println!("{}", path);
 
-    let response: &str = match path {
-        "/" => "HTTP/1.1 200 OK\r\n\r\n",
-        _ => "HTTP/1.1 404 NOT FOUND\r\n\r\n"
+    let response: String = match path {
+        "/" => "HTTP/1.1 200 OK\r\n\r\n".to_string(),
+        _ if path.starts_with("/echo/") => {
+            let echo = path.strip_prefix("/echo/").expect("No content to echo.... nothing beyond /echo/");
+            println!("{}", echo);
+            format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}", echo.len(), echo)
+        },
+        _ => "HTTP/1.1 404 NOT FOUND\r\n\r\n".to_string()
     };
 
     stream.write_all(response.as_bytes()).unwrap();
