@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use std::{net::{TcpListener, TcpStream}, io::{Write, Read}, iter::Map, str::FromStr, collections::HashMap};
+use std::{net::{TcpListener, TcpStream}, io::{Write, Read}, str::FromStr, collections::HashMap, thread};
 use std::str;
 
 enum HttpMethod {
@@ -66,8 +66,8 @@ impl FromStr for Request {
 
 fn handle_connection(mut stream: TcpStream) {
     let mut buf = [0; 1024];
-    stream.read(&mut buf).expect("Error reading stream into a buffer");
-    let request = str::from_utf8(&buf).expect("Unable to parse request as &str").parse::<Request>().expect("Unable to parse Request");
+    let data_recv_bytes = stream.read(&mut buf).expect("Error reading stream into a buffer");
+    let request = str::from_utf8(&buf[..data_recv_bytes]).expect("Unable to parse request as &str").parse::<Request>().expect("Unable to parse Request");
 
     let response: String = match request.start_line.path.as_str() {
         "/" => "HTTP/1.1 200 OK\r\n\r\n".to_string(),
@@ -95,8 +95,10 @@ fn main() {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                println!("accepted new connection");
-                handle_connection(stream);
+                thread::spawn(|| {
+                    println!("accepted new connection");
+                    handle_connection(stream);
+                });
             }
             Err(e) => {
                 println!("error: {}", e);
