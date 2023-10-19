@@ -1,8 +1,7 @@
 use std::{net::{TcpListener, TcpStream}, io::Write};
 
 fn handle_connection(mut stream: TcpStream) {
-    let response = "HTTP/1.1 200 OK\r\n\r\n";
-    stream.write_all(response.as_bytes()).unwrap();
+    stream.write_all("HTTP/1.1 200 OK\r\n\r\n".as_bytes()).unwrap();
 }
 
 fn main() {
