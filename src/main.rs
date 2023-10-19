@@ -1,7 +1,21 @@
-use std::{net::{TcpListener, TcpStream}, io::Write};
+use std::{net::{TcpListener, TcpStream}, io::{Write, Read}};
+use std::str;
 
 fn handle_connection(mut stream: TcpStream) {
-    stream.write_all("HTTP/1.1 200 OK\r\n\r\n".as_bytes()).unwrap();
+    let mut buf = [0; 1024];
+    stream.read(&mut buf).unwrap();
+    let request = str::from_utf8(&buf).expect("Unable to parse request as &str");
+    println!("{}", request);
+    let path = request.split_whitespace().nth(1).expect("PATH was not found at specified position");
+    println!("{}", path);
+
+    let response: &str = match path {
+        "/" => "HTTP/1.1 200 OK\r\n\r\n",
+        _ => "HTTP/1.1 404 NOT FOUND\r\n\r\n"
+    };
+
+    stream.write_all(response.as_bytes()).unwrap();
+    stream.flush().unwrap();
 }
 
 fn main() {
