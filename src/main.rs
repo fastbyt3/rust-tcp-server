@@ -1,9 +1,15 @@
 #![allow(dead_code)]
-use std::{net::{TcpListener, TcpStream}, io::{Write, Read}, str::FromStr, collections::HashMap, thread};
 use std::str;
+use std::{
+    collections::HashMap,
+    io::{Read, Write},
+    net::{TcpListener, TcpStream},
+    str::FromStr,
+    thread,
+};
 
 enum HttpMethod {
-    GET
+    GET,
 }
 
 impl FromStr for HttpMethod {
@@ -12,7 +18,7 @@ impl FromStr for HttpMethod {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "GET" => Ok(HttpMethod::GET),
-            _ => Err(format!("Unexpected HTTP method -> {}", s))
+            _ => Err(format!("Unexpected HTTP method -> {}", s)),
         }
     }
 }
@@ -26,14 +32,19 @@ struct RequestStartLine {
 impl RequestStartLine {
     fn construct(s: &str) -> RequestStartLine {
         let mut start_line_parts = s.split_whitespace();
-        let method = start_line_parts.next()
+        let method = start_line_parts
+            .next()
             .unwrap()
             .parse::<HttpMethod>()
             .unwrap();
         let path = start_line_parts.next().unwrap().to_string();
         let version = start_line_parts.next().unwrap().to_string();
 
-        RequestStartLine { method, path, version }
+        RequestStartLine {
+            method,
+            path,
+            version,
+        }
     }
 }
 
@@ -60,27 +71,66 @@ impl FromStr for Request {
             }
         }
 
-        Ok(Request { start_line, headers })
+        Ok(Request {
+            start_line,
+            headers,
+        })
     }
 }
 
 fn handle_connection(mut stream: TcpStream) {
     let mut buf = [0; 1024];
-    let data_recv_bytes = stream.read(&mut buf).expect("Error reading stream into a buffer");
-    let request = str::from_utf8(&buf[..data_recv_bytes]).expect("Unable to parse request as &str").parse::<Request>().expect("Unable to parse Request");
-
+    let data_recv_bytes = stream
+        .read(&mut buf)
+        .expect("Error reading stream into a buffer");
+    let request = str::from_utf8(&buf[..data_recv_bytes])
+        .expect("Unable to parse request as &str")
+        .parse::<Request>()
+        .expect("Unable to parse Request");
     let response: String = match request.start_line.path.as_str() {
         "/" => "HTTP/1.1 200 OK\r\n\r\n".to_string(),
         _ if request.start_line.path.starts_with("/echo/") => {
             let echo = request.start_line.path.strip_prefix("/echo/").unwrap();
-            println!("{}", echo);
-            format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}", echo.len(), echo)
-        },
-        "/user-agent" => {
-            let ua = request.headers.get("User-Agent").expect("Couldnt find User-Agent key in headers map");
-            format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}", ua.len(), ua)
+            format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
+                echo.len(),
+                echo
+            )
         }
-        _ => "HTTP/1.1 404 NOT FOUND\r\n\r\n".to_string()
+        "/user-agent" => {
+            let ua = request
+                .headers
+                .get("User-Agent")
+                .expect("Couldnt find User-Agent key in headers map");
+            format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
+                ua.len(),
+                ua
+            )
+        }
+        path if request.start_line.path.starts_with("/files/") => {
+            let file_name: String = path
+                .strip_prefix("/files/")
+                .expect("Couldnt get filename")
+                .to_string();
+            let directory: String = std::env::args()
+                .nth(2)
+                .expect("Didnt receive absoulte path")
+                .to_string();
+            let file_path = format!("{}/{}", directory, file_name);
+
+            if let Ok(content) = std::fs::read_to_string(file_path) {
+                let x = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {}\r\n\r\n{}",
+                    content.len(),
+                    content
+                );
+                x
+            } else {
+                "HTTP/1.1 404 NOT FOUND\r\n\r\n".to_string()
+            }
+        }
+        _ => "HTTP/1.1 404 NOT FOUND\r\n\r\n".to_string(),
     };
 
     stream.write_all(response.as_bytes()).unwrap();
@@ -90,7 +140,8 @@ fn handle_connection(mut stream: TcpStream) {
 fn main() {
     println!("Logs from your program will appear here!");
 
-    let listener = TcpListener::bind("127.0.0.1:4221").expect("Couldn't start a TCP Listener at port 4221");
+    let listener =
+        TcpListener::bind("127.0.0.1:4221").expect("Couldn't start a TCP Listener at port 4221");
 
     for stream in listener.incoming() {
         match stream {
